@@ -1,0 +1,102 @@
+main py
+
+import pandas as pd
+import numpy as np
+from data_preprocessing import DataPreprocessor
+from model_training import CropRecommendationModel
+from crop_predictor import CropPredictor
+import joblib
+
+def main():
+    """Main pipeline for crop recommendation system"""
+    
+    print("=" * 50)
+    print("CROP RECOMMENDATION SYSTEM")
+    print("=" * 50)
+    
+    # Step 1: Data Preprocessing
+    print("\n[1] Loading and preprocessing data...")
+    preprocessor = DataPreprocessor()
+    
+    try:
+        X, y = preprocessor.prepare_data('crop_data.csv')  # Replace with your data file
+        print(f"✓ Data loaded successfully!")
+        print(f"  Features shape: {X.shape}")
+        print(f"  Number of crops: {len(np.unique(y))}")
+    except FileNotFoundError:
+        print("✗ Data file not found. Creating sample data...")
+        X, y = create_sample_data()
+    
+    # Step 2: Model Training
+    print("\n[2] Training crop recommendation model...")
+    model_trainer = CropRecommendationModel()
+    X_train, X_test, y_train, y_test = model_trainer.train(X, y)
+    
+    # Save model and scaler
+    model_trainer.save_model('crop_recommendation_model.pkl')
+    joblib.dump(preprocessor.scaler, 'scaler.pkl')
+    joblib.dump(model_trainer.label_encoder, 'label_encoder.pkl')
+    
+    # Feature importance
+    print("\n[3] Feature Importance:")
+    importance_df = model_trainer.get_feature_importance(top_n=7)
+    print(importance_df)
+    
+    # Step 4: Make predictions
+    print("\n[4] Making predictions on test data...")
+    predictor = CropPredictor('crop_recommendation_model.pkl', 'scaler.pkl')
+    
+    # Example prediction
+    result = predictor.predict(
+        nitrogen=90,
+        phosphorus=42,
+        potassium=43,
+        temperature=21.77,
+        humidity=82.0,
+        ph=6.5,
+        rainfall=220.0
+    )
+    
+    print(f"\n✓ Prediction Result:")
+    print(f"  Recommended Crop: {result['recommended_crop']}")
+    print(f"  Confidence: {result['confidence']}%")
+    print(f"  Description: {result['description']}")
+    
+    # Top recommendations
+    print("\n[5] Top 3 Crop Recommendations:")
+    top_crops = predictor.recommend_top_crops(90, 42, 43, 21.77, 82.0, 6.5, 220.0, top_n=3)
+    for i, rec in enumerate(top_crops, 1):
+        print(f"  {i}. {rec['crop']}: {rec['probability']*100:.2f}%")
+
+def create_sample_data():
+    """Create sample data for demonstration"""
+    np.random.seed(42)
+    
+    n_samples = 500
+    crops = ['rice', 'maize', 'chickpea', 'kidneybeans', 'pigeonpeas', 
+             'mothbeans', 'mungbean', 'blackgram', 'lentil', 'pomegranate',
+             'banana', 'mango', 'grapes', 'watermelon', 'muskmelon',
+             'apple', 'orange', 'papaya', 'coconut']
+    
+    data = {
+        'N': np.random.randint(0, 140, n_samples),
+        'P': np.random.randint(5, 145, n_samples),
+        'K': np.random.randint(5, 205, n_samples),
+        'temperature': np.random.uniform(8, 44, n_samples),
+        'humidity': np.random.uniform(20, 100, n_samples),
+        'ph': np.random.uniform(3.5, 9.5, n_samples),
+        'rainfall': np.random.uniform(20, 300, n_samples),
+        'label': np.random.choice(crops, n_samples)
+    }
+    
+    df = pd.DataFrame(data)
+    df.to_csv('crop_data.csv', index=False)
+    
+    preprocessor = DataPreprocessor()
+    X, y = preprocessor.prepare_data('crop_data.csv')
+    
+    return X, y
+
+if __name__ == "__main__":
+    main()
+
