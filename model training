@@ -1,0 +1,91 @@
+model training
+
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+import pickle
+import joblib
+
+class CropRecommendationModel:
+    """Train and evaluate crop recommendation model"""
+    
+    def __init__(self):
+        self.model = None
+        self.label_encoder = LabelEncoder()
+        self.feature_names = ['N', 'P', 'K', 'temperature', 'humidity', 'ph', 'rainfall']
+        
+    def train(self, X, y, test_size=0.2, random_state=42):
+        """Train Random Forest model with hyperparameter tuning"""
+        
+        # Encode target labels
+        y_encoded = self.label_encoder.fit_transform(y)
+        
+        # Split data
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y_encoded, test_size=test_size, random_state=random_state
+        )
+        
+        # Hyperparameter tuning
+        param_grid = {
+            'n_estimators': [100, 200, 300],
+            'max_depth': [10, 20, 30],
+            'min_samples_split': [2, 5, 10],
+            'min_samples_leaf': [1, 2, 4]
+        }
+        
+        rf = RandomForestClassifier(random_state=random_state)
+        grid_search = GridSearchCV(rf, param_grid, cv=5, scoring='accuracy', n_jobs=-1)
+        grid_search.fit(X_train, y_train)
+        
+        self.model = grid_search.best_estimator_
+        
+        print(f"Best Parameters: {grid_search.best_params_}")
+        print(f"Best CV Score: {grid_search.best_score_:.4f}")
+        
+        # Evaluate on test set
+        y_pred = self.model.predict(X_test)
+        self.evaluate(y_test, y_pred)
+        
+        return X_train, X_test, y_train, y_test
+    
+    def evaluate(self, y_test, y_pred):
+        """Evaluate model performance"""
+        accuracy = accuracy_score(y_test, y_pred)
+        precision = precision_score(y_test, y_pred, average='weighted')
+        recall = recall_score(y_test, y_pred, average='weighted')
+        f1 = f1_score(y_test, y_pred, average='weighted')
+        
+        print("\n=== Model Evaluation ===")
+        print(f"Accuracy:  {accuracy:.4f}")
+        print(f"Precision: {precision:.4f}")
+        print(f"Recall:    {recall:.4f}")
+        print(f"F1-Score:  {f1:.4f}")
+        
+        return {'accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1': f1}
+    
+    def get_feature_importance(self, top_n=10):
+        """Get feature importance from trained model"""
+        if self.model is None:
+            raise ValueError("Model not trained yet")
+        
+        importances = self.model.feature_importances_
+        feature_importance_df = pd.DataFrame({
+            'feature': self.feature_names,
+            'importance': importances
+        }).sort_values('importance', ascending=False)
+        
+        return feature_importance_df.head(top_n)
+    
+    def save_model(self, model_path='crop_recommendation_model.pkl'):
+        """Save trained model to disk"""
+        joblib.dump(self.model, model_path)
+        print(f"Model saved to {model_path}")
+    
+    def load_model(self, model_path='crop_recommendation_model.pkl'):
+        """Load trained model from disk"""
+        self.model = joblib.load(model_path)
+        print(f"Model loaded from {model_
+
