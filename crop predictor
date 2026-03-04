@@ -1,0 +1,99 @@
+crop predictor
+
+import numpy as np
+import joblib
+from sklearn.preprocessing import StandardScaler
+
+class CropPredictor:
+    """Make crop recommendations based on input parameters"""
+    
+    def __init__(self, model_path='crop_recommendation_model.pkl', scaler_path='scaler.pkl'):
+        self.model = joblib.load(model_path)
+        self.scaler = joblib.load(scaler_path)
+        self.crop_descriptions = {
+            'rice': 'Best grown in warm, wet climates. Requires adequate water supply.',
+            'maize': 'Thrives in moderate climate. Needs good drainage and sunlight.',
+            'chickpea': 'Drought-tolerant. Prefers cool season. Good for crop rotation.',
+            'kidneybeans': 'Requires warm weather. Needs well-drained soil.',
+            'pigeonpeas': 'Heat and drought tolerant. Useful in intercropping systems.',
+            'mothbeans': 'Hardy crop. Suitable for arid regions.',
+            'mungbean': 'Fast-growing legume. Requires warm temperature.',
+            'blackgram': 'Winter crop. Needs moderate temperature and moisture.',
+            'lentil': 'Cool season crop. Drought tolerant.',
+            'pomegranate': 'Perennial fruit crop. Drought resistant.',
+            'banana': 'Tropical fruit. Requires high humidity and warmth.',
+            'mango': 'Tropical tree. Needs warm, dry season for fruiting.',
+            'grapes': 'Perennial crop. Requires well-drained soil.',
+            'watermelon': 'Summer crop. Needs warmth and adequate water.',
+            'muskmelon': 'Summer vegetable. Requires warm weather.',
+            'apple': 'Temperate climate fruit. Needs chill hours.',
+            'orange': 'Citrus fruit. Prefers subtropical climate.',
+            'papaya': 'Tropical fruit. Fast growing. Needs warmth.',
+            'coconut': 'Tropical palm. Grows in sandy, well-drained soil.'
+        }
+    
+    def predict(self, nitrogen, phosphorus, potassium, temperature, humidity, ph, rainfall):
+        """
+        Predict suitable crop based on input parameters
+        
+        Args:
+            nitrogen (float): Nitrogen content in soil (kg/ha)
+            phosphorus (float): Phosphorus content in soil (kg/ha)
+            potassium (float): Potassium content in soil (kg/ha)
+            temperature (float): Average temperature in Celsius
+            humidity (float): Relative humidity in percentage
+            ph (float): Soil pH value (0-14)
+            rainfall (float): Rainfall in mm
+        
+        Returns:
+            dict: Predicted crop and confidence information
+        """
+        
+        # Prepare input
+        input_data = np.array([[nitrogen, phosphorus, potassium, 
+                               temperature, humidity, ph, rainfall]])
+        
+        # Scale input
+        input_scaled = self.scaler.transform(input_data)
+        
+        # Make prediction
+        crop_pred = self.model.predict(input_scaled)[0]
+        probabilities = self.model.predict_proba(input_scaled)[0]
+        confidence = np.max(probabilities) * 100
+        
+        # Get crop description
+        description = self.crop_descriptions.get(crop_pred, 'No description available')
+        
+        return {
+            'recommended_crop': crop_pred,
+            'confidence': round(confidence, 2),
+            'description': description
+        }
+    
+    def recommend_top_crops(self, nitrogen, phosphorus, potassium, 
+                           temperature, humidity, ph, rainfall, top_n=3):
+        """
+        Recommend top N crops based on prediction probabilities
+        
+        Args:
+            top_n (int): Number of top crops to recommend
+        
+        Returns:
+            list: Top N crops with probabilities
+        """
+        
+        input_data = np.array([[nitrogen, phosphorus, potassium, 
+                               temperature, humidity, ph, rainfall]])
+        
+        input_scaled = self.scaler.transform(input_data)
+        probabilities = self.model.predict_proba(input_scaled)[0]
+        crop_names = self.model.classes_
+        
+        # Create dataframe and sort
+        recommendations = pd.DataFrame({
+            'crop': crop_names,
+            'probability': probabilities
+        }).sort_values('probability', ascending=False).head(top_n)
+        
+        return recommendations.to_dict('records')
+
