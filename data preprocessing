@@ -1,0 +1,73 @@
+data preprocessing
+
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+import pickle
+
+class DataPreprocessor:
+    """Preprocess agricultural data for crop recommendation"""
+    
+    def __init__(self):
+        self.scaler = StandardScaler()
+        self.label_encoder = LabelEncoder()
+        
+    def load_data(self, filepath):
+        """Load dataset from CSV"""
+        df = pd.read_csv(filepath)
+        return df
+    
+    def clean_data(self, df):
+        """Clean and handle missing values"""
+        # Remove duplicates
+        df = df.drop_duplicates()
+        
+        # Fill missing values with mean for numerical columns
+        numerical_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numerical_cols:
+            df[col].fillna(df[col].mean(), inplace=True)
+        
+        return df
+    
+    def handle_outliers(self, df, columns, threshold=3):
+        """Remove outliers using Z-score method"""
+        for col in columns:
+            z_scores = np.abs((df[col] - df[col].mean()) / df[col].std())
+            df = df[z_scores < threshold]
+        return df
+    
+    def encode_categorical(self, df, categorical_cols):
+        """Encode categorical variables"""
+        for col in categorical_cols:
+            if col in df.columns:
+                df[col] = self.label_encoder.fit_transform(df[col])
+        return df
+    
+    def scale_features(self, X):
+        """Normalize numerical features"""
+        return self.scaler.fit_transform(X)
+    
+    def prepare_data(self, filepath):
+        """Complete preprocessing pipeline"""
+        df = self.load_data(filepath)
+        df = self.clean_data(df)
+        
+        # Define feature columns (adjust based on your dataset)
+        feature_cols = ['N', 'P', 'K', 'temperature', 'humidity', 'ph', 'rainfall']
+        target_col = 'label'  # crop name
+        
+        if all(col in df.columns for col in feature_cols) and target_col in df.columns:
+            X = df[feature_cols]
+            y = df[target_col]
+            
+            # Handle outliers
+            X = self.handle_outliers(X, feature_cols)
+            y = y.loc[X.index]
+            
+            # Scale features
+            X_scaled = self.scale_features(X)
+            
+            return X_scaled, y
+        else:
+            raise ValueError(f"Required columns not found in dataset")
+
